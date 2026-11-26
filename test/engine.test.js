@@ -82,7 +82,13 @@ test('over ends after six legal balls: strike swaps, new bowler needed, maiden r
   assert.equal(inn.strikerId, 'a2');
   assert.equal(inn.bowling[0].maidens, 1);
   assert.throws(() => play(setup(), ...dots(6), ball(0)), /bowler/i);
-  assert.throws(() => play(setup(), ...dots(6), { type: 'new_bowler', bowlerId: 'b1' }), /two overs in a row/);
+});
+
+test('the same bowler can bowl the next over', () => {
+  const s = play(setup(), ...dots(6), { type: 'new_bowler', bowlerId: 'b1' }, ...dots(6));
+  const inn = s.innings[0];
+  assert.equal(inn.legalBalls, 12);
+  assert.deepEqual([inn.bowling.length, inn.bowling[0].overs, inn.bowling[0].maidens], [1, '2.0', 2]);
 });
 
 test('wicket: new batter is required and takes the vacant end', () => {

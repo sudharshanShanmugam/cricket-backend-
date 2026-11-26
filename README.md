@@ -76,7 +76,7 @@ Socket.IO: emit `watch` with a match id to receive `match:update` and
 
 All rules live in `src/scoring/engine.js`.
 
-- Six legal balls per over; a bowler cannot bowl consecutive overs.
+- Six legal balls per over; the same bowler may bowl consecutive overs.
 - Wide and no ball: 1 run penalty and the ball is bowled again. No free-hit tracking.
 - Byes and leg byes are not charged to the bowler.
 - An innings ends when overs run out, the target is passed, or no batter is left.

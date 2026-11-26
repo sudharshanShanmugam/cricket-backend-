@@ -399,7 +399,6 @@ function onNewBatter(match, state, { batterId }) {
 function onNewBowler(match, state, { bowlerId }) {
   const inn = openInnings(state);
   requirePlayer(match, inn.bowlingTeam, bowlerId, 'bowler');
-  if (bowlerId === inn.lastOverBowlerId) fail('A bowler cannot bowl two overs in a row');
   if (bowlerId === inn.bowlerId) fail('That player is already bowling');
   const row = bowler(match, inn, bowlerId);
   inn.bowlerId = bowlerId;

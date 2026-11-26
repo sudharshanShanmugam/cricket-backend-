@@ -3,6 +3,7 @@ services:
     name: trident-cricket-api
     runtime: node
     plan: free
+    region: virginia
     buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /api/health
