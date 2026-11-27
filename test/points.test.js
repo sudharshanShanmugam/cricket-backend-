@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { pointsTable } from '../src/scoring/points.js';
+import { leaders, pointsTable } from '../src/scoring/points.js';
 
 const TEAMS = ['A', 'B', 'C'].map((x) => ({ id: x, name: `Team ${x}`, shortName: x }));
 const players = (t) => [1, 2, 3].map((n) => ({ id: `${t}${n}`, name: `${t}${n}` }));
@@ -94,4 +94,26 @@ test('a Super Over win earns the points but leaves net run rate alone', () => {
   const t = pointsTable(TEAMS, [m]);
   assert.deepEqual([row(t, 'A').won, row(t, 'A').points, row(t, 'A').nrr], [1, 2, 0]);
   assert.deepEqual([row(t, 'B').lost, row(t, 'B').points, row(t, 'B').nrr], [1, 0, 0]);
+});
+
+test('leaders add up every match and ignore Super Overs', () => {
+  const first = played('A', 'B', [6, 6, 'W', 1, 0, 0], SIX);
+  const final = played('A', 'C', [4, 0, 0, 0, 0, 0], ['W', 'W'], { stage: 'final' });
+  const tied = played('B', 'C', SIX, SIX);
+  tied.events.push(
+    { type: 'innings_start', strikerId: 'C1', nonStrikerId: 'C2', bowlerId: 'B1' },
+    ...balls([6, 6, 6, 6, 6, 6]),
+  );
+  const top = leaders([first, final, tied]);
+  assert.equal(top.batters.length, 3);
+  assert.deepEqual(
+    [top.batters[0].playerId, top.batters[0].team, top.batters[0].runs, top.batters[0].balls],
+    ['A1', 'A', 16, 9],
+  );
+  // A1 bowled both wickets of the final; B1 took one in the first match.
+  assert.deepEqual(top.bowlers.map((b) => [b.playerId, b.wickets]), [['A1', 2], ['B1', 1]]);
+});
+
+test('no leaders before any ball is bowled', () => {
+  assert.deepEqual(leaders([fixture('A', 'B')]), { batters: [], bowlers: [] });
 });

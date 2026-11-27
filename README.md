@@ -59,7 +59,7 @@ instances would also need the Socket.IO Redis adapter.
 | POST / PUT / DELETE | `/api/teams[/:id]` | yes | Manage teams and players |
 | GET | `/api/matches` | no | Live, upcoming and recent matches |
 | GET | `/api/matches/:id` | no | Full scorecard |
-| GET | `/api/points` | no | League points table and the final |
+| GET | `/api/points` | no | League points table, top players and the final |
 | POST / PUT / DELETE | `/api/matches[/:id]` | yes | Manage matches |
 | POST | `/api/matches/:id/events` | yes | `{rev, event}` scores one action |
 | POST | `/api/matches/:id/undo` | yes | `{rev}` removes the last action |
@@ -97,6 +97,8 @@ Rules live in `src/scoring/points.js`.
 - NRR = runs scored per over faced, minus runs conceded per over bowled. A side
   that is bowled out, or whose innings is ended early, is charged its full overs.
   Abandoned matches and Super Overs are left out of NRR.
+- The top 3 run scorers and wicket takers count every match, the final included.
+  Super Overs are left out.
 - The league is complete when every pair of teams has met and no league match is
   waiting to be played. The top 2 then qualify for the final. Teams level on both
   points and NRR for a qualifying place are flagged instead of being picked.

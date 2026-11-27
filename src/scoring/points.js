@@ -1,13 +1,14 @@
 /**
- * League points table.
+ * League points table and the leading players.
  *
  * Nothing is stored: the table is worked out from the match events every time,
  * so a corrected or deleted match is reflected straight away.
  */
-import { BALLS_PER_OVER, computeState } from './engine.js';
+import { BALLS_PER_OVER, computeState, oversText } from './engine.js';
 
 export const POINTS = { win: 2, loss: 0, tie: 1, noResult: 1 };
 export const FINALISTS = 2;
+export const LEADERS = 3;
 
 const FINISHED = new Set(['completed', 'abandoned']);
 
@@ -128,5 +129,63 @@ export function pointsTable(teams, matches) {
       qualified: complete && i < FINALISTS && !tiedForPlace.includes(r.teamId),
     })),
     league: { complete, pending, pairs, pairsMet, finalists: FINALISTS, tiedForPlace },
+  };
+}
+
+/**
+ * Top run scorers and wicket takers over every match played, the final included.
+ * As in official statistics, Super Overs do not count.
+ */
+export function leaders(matches) {
+  const players = new Map();
+
+  for (const match of matches) {
+    for (const inn of computeState(match).innings) {
+      if (inn.superOver) continue;
+      const tally = (side, id, name) => {
+        const team = match.teams[side];
+        const key = `${team.teamId}:${id}`;
+        if (!players.has(key)) {
+          players.set(key, { playerId: id, teamId: String(team.teamId), runs: 0, balls: 0, wickets: 0, conceded: 0, bowled: 0 });
+        }
+        // Matches arrive oldest first, so renamed players and teams show their latest name.
+        return Object.assign(players.get(key), { name, team: team.shortName });
+      };
+      for (const b of inn.batting) {
+        const p = tally(inn.battingTeam, b.id, b.name);
+        p.runs += b.runs;
+        p.balls += b.balls;
+      }
+      for (const b of inn.bowling) {
+        const p = tally(inn.bowlingTeam, b.id, b.name);
+        p.wickets += b.wickets;
+        p.conceded += b.runs;
+        p.bowled += b.balls;
+      }
+    }
+  }
+
+  const top = (key, order) =>
+    [...players.values()]
+      .filter((p) => p[key] > 0)
+      .sort((a, b) => b[key] - a[key] || order(a, b) || a.name.localeCompare(b.name))
+      .slice(0, LEADERS);
+  const who = ({ playerId, teamId, name, team }) => ({ playerId, teamId, name, team });
+
+  return {
+    // Level on runs: the quicker scorer comes first.
+    batters: top('runs', (a, b) => a.balls - b.balls).map((p) => ({
+      ...who(p),
+      runs: p.runs,
+      balls: p.balls,
+      strikeRate: p.balls ? Number(((p.runs * 100) / p.balls).toFixed(1)) : 0,
+    })),
+    // Level on wickets: fewer runs conceded comes first, then fewer balls bowled.
+    bowlers: top('wickets', (a, b) => a.conceded - b.conceded || a.bowled - b.bowled).map((p) => ({
+      ...who(p),
+      wickets: p.wickets,
+      runs: p.conceded,
+      overs: oversText(p.bowled),
+    })),
   };
 }
