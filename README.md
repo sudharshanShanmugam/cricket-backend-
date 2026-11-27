@@ -86,6 +86,17 @@ All rules live in `src/scoring/engine.js`.
   The scorer can instead finish the match as a tie. No DLS rain calculation.
 - No per-bowler over limit.
 
+## Man of the Match
+
+Chosen automatically when a match is completed (not when it is abandoned), using
+the impact points in `src/scoring/award.js`: runs and boundaries, scoring rate,
+wickets, economy, catches, stumpings, run outs and a small bonus for winning.
+Expensive overs or slow batting never take points away.
+
+**Man of the Tournament** is the player with the most impact points added up over
+every completed match, the final included. Super Overs are left out. Until the
+final is completed it shows who is leading.
+
 ## Points table
 
 Rules live in `src/scoring/points.js`.

@@ -102,6 +102,7 @@ test('full flow with live updates, stale-write protection and undo', async () =>
   assert.equal(points.data.league.pending, 1);
   assert.equal(points.data.final, null);
   assert.equal(points.data.leaders.batters[0].runs, 4);
+  assert.equal(points.data.playerOfTournament, null);
   assert.equal((await call(`/api/matches/${id}`, { method: 'PUT', body: {} })).status, 409);
   assert.equal((await call(`/api/matches/${id}`, { method: 'DELETE' })).status, 204);
   assert.equal((await call(`/api/matches/${id}`)).status, 404);

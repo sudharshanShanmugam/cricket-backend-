@@ -1,3 +1,4 @@
+import { playerOfMatch } from './scoring/award.js';
 import { computeState } from './scoring/engine.js';
 
 const base = (m) => ({
@@ -18,9 +19,13 @@ export const listView = (m) => ({
 });
 
 /** Full live scorecard. */
-export const matchView = (m) => ({
-  ...base(m),
-  teams: m.teams,
-  eventCount: m.events.length,
-  ...computeState(m),
-});
+export const matchView = (m) => {
+  const state = computeState(m);
+  return {
+    ...base(m),
+    teams: m.teams,
+    eventCount: m.events.length,
+    ...state,
+    playerOfMatch: playerOfMatch(m, state),
+  };
+};

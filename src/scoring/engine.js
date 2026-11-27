@@ -237,6 +237,7 @@ function onInningsStart(match, state, { strikerId, nonStrikerId, bowlerId }) {
     bowling: [],
     overs: [],
     fow: [],
+    fielders: [], // one entry for each catch, stumping or run out
     partnership: { runs: 0, balls: 0 },
     strikerId,
     nonStrikerId,
@@ -346,6 +347,7 @@ function onBall(match, state, event) {
     inn.wickets += 1;
     over.wickets += 1;
     if (BOWLER_WICKETS.has(wicket.kind)) bowl.wickets += 1;
+    if (wicket.fielderId && ['caught', 'stumped', 'run out'].includes(wicket.kind)) inn.fielders.push(wicket.fielderId);
     inn.fow.push({ wicket: inn.wickets, runs: inn.runs, over: oversText(inn.legalBalls), playerId: outId, name: out.name });
     inn.partnership = { runs: 0, balls: 0 };
     if (inn.strikerId === outId) inn.strikerId = null;
