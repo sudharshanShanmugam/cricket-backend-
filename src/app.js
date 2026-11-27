@@ -8,6 +8,7 @@ import { createLive } from './live.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 import { authRoutes } from './routes/auth.js';
 import { matchRoutes } from './routes/matches.js';
+import { pointsRoutes } from './routes/points.js';
 import { teamRoutes } from './routes/teams.js';
 
 export function createApp(config) {
@@ -28,6 +29,7 @@ export function createApp(config) {
   app.use('/api/auth', authRoutes(config));
   app.use('/api/teams', teamRoutes(config));
   app.use('/api/matches', matchRoutes(config, live));
+  app.use('/api/points', pointsRoutes());
   app.use(notFound);
   app.use(errorHandler);
 

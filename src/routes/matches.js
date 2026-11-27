@@ -19,6 +19,7 @@ const matchSchema = z.object({
   venue: z.string().trim().max(80).default(''),
   scheduledAt: z.coerce.date().optional(),
   overs: z.number().int().min(1).max(50),
+  stage: z.enum(['league', 'final']).default('league'),
   teamA: side,
   teamB: side,
 });
@@ -67,6 +68,7 @@ async function buildMatch(body) {
     venue: data.venue,
     scheduledAt: data.scheduledAt ?? new Date(),
     overs: data.overs,
+    stage: data.stage,
     teams: await buildSides(data),
     events: [],
   };

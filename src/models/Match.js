@@ -6,6 +6,8 @@ const matchSchema = new mongoose.Schema(
     venue: { type: String, default: '' },
     scheduledAt: { type: Date, default: Date.now },
     overs: { type: Number, required: true },
+    // Only league matches count towards the points table.
+    stage: { type: String, enum: ['league', 'final'], default: 'league' },
     // Snapshot of both squads, so later team edits never rewrite match history.
     teams: { type: [mongoose.Schema.Types.Mixed], required: true },
     events: { type: [mongoose.Schema.Types.Mixed], default: [] },

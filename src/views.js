@@ -6,6 +6,7 @@ const base = (m) => ({
   venue: m.venue,
   scheduledAt: m.scheduledAt,
   overs: m.overs,
+  stage: m.stage ?? 'league',
   rev: m.rev,
 });
 
