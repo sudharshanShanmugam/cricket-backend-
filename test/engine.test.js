@@ -145,9 +145,52 @@ test('defending side wins by runs', () => {
   assert.equal(s.result.winner, 0);
 });
 
-test('tie', () => {
-  const s = play(setup({ overs: 1 }), ball(4), ...dots(5), second, ball(4), ...dots(5));
-  assert.equal(s.result.text, 'Match tied');
+const level = [ball(4), ...dots(5), second, ball(4), ...dots(5)];
+const bravoFirst = second; // the side that batted second starts the Super Over
+const alphaChase = { type: 'innings_start', strikerId: 'a1', nonStrikerId: 'a2', bowlerId: 'b1' };
+const out = { type: 'ball', runs: 0, wicket: { kind: 'bowled' } };
+
+test('level scores wait for a Super Over', () => {
+  const m = setup({ overs: 1 });
+  const s = play(m, ...level);
+  assert.deepEqual([s.status, s.phase, s.result], ['live', 'tied', null]);
+  assert.equal(summarise(m, s).line, 'Scores level - Super Over next');
+  assert.throws(() => play(m, ...level, ball(1)), /no innings/);
+});
+
+test('Super Over: second side bats first, six balls, winner takes the match', () => {
+  const m = setup({ overs: 5 });
+  const tied = [ball(4), { type: 'end_innings' }, second, ball(4), { type: 'end_innings' }];
+  const mid = play(m, ...tied, bravoFirst, ball(6), ...dots(5));
+  const inn = mid.innings[2];
+  assert.deepEqual([inn.battingTeam, inn.superOver, inn.closeReason, mid.phase], [1, 1, 'overs', 'innings_break']);
+  assert.equal(summarise(m, mid).line, 'Super Over break - target 7');
+
+  const s = play(m, ...tied, bravoFirst, ball(6), ...dots(5), alphaChase, ball(1), ball(6));
+  assert.equal(s.innings[3].battingTeam, 0);
+  assert.deepEqual(s.result, { winner: 0, text: 'Match tied - Alpha won the Super Over' });
+});
+
+test('Super Over innings ends after two wickets', () => {
+  const s = play(setup({ overs: 1 }), ...level, bravoFirst, out, { type: 'new_batter', batterId: 'b3' }, out);
+  assert.equal(s.innings[2].closeReason, 'all out');
+  assert.equal(s.innings[2].legalBalls, 2);
+});
+
+test('a level Super Over leads to another, with the order swapped', () => {
+  const again = [...level, bravoFirst, ball(2), ...dots(5), alphaChase, ball(2), ...dots(5)];
+  const m = setup({ overs: 1 });
+  assert.equal(play(m, ...again).phase, 'tied');
+  const s = play(m, ...again, alphaChase, ball(4), ...dots(5), second, ...dots(6));
+  assert.deepEqual([s.innings[4].battingTeam, s.innings[4].superOver], [0, 2]);
+  assert.equal(s.result.text, 'Match tied - Alpha won the Super Over');
+});
+
+test('the scorer can finish level scores as a tie', () => {
+  for (const extra of [[], [bravoFirst, ball(1)]]) {
+    const s = play(setup({ overs: 1 }), ...level, ...extra, { type: 'abandon' });
+    assert.deepEqual([s.status, s.result], ['completed', { winner: null, text: 'Match tied' }]);
+  }
 });
 
 test('chase figures and summary', () => {

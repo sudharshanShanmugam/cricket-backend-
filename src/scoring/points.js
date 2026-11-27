@@ -84,7 +84,8 @@ export function pointsTable(teams, matches) {
 
       // A match without a result does not affect net run rate.
       if (state.status === 'abandoned') return;
-      for (const inn of state.innings) {
+      // Super Overs decide the winner but never count towards net run rate.
+      for (const inn of state.innings.filter((i) => !i.superOver)) {
         const balls = ballsCounted(match, inn);
         if (inn.battingTeam === side) {
           row.runsFor += inn.runs;

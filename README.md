@@ -81,7 +81,9 @@ All rules live in `src/scoring/engine.js`.
 - Wide and no ball: 1 run penalty and the ball is bowled again. No free-hit tracking.
 - Byes and leg byes are not charged to the bowler.
 - An innings ends when overs run out, the target is passed, or no batter is left.
-- A tie is recorded as a tie (no super over). No DLS rain calculation.
+- Level scores go to a Super Over: one over each, and 2 wickets end the innings.
+  The side that batted second bats first. A level Super Over leads to another.
+  The scorer can instead finish the match as a tie. No DLS rain calculation.
 - No per-bowler over limit.
 
 ## Points table
@@ -89,11 +91,12 @@ All rules live in `src/scoring/engine.js`.
 Rules live in `src/scoring/points.js`.
 
 - Only league matches count; the match marked as the final does not.
-- Win 2 points, loss 0, tie or no result (abandoned) 1 each.
+- Win 2 points, loss 0, tie or no result (abandoned) 1 each. A match decided by a
+  Super Over is a win and a loss.
 - Teams are ranked by points, then net run rate (NRR).
 - NRR = runs scored per over faced, minus runs conceded per over bowled. A side
   that is bowled out, or whose innings is ended early, is charged its full overs.
-  Abandoned matches are left out of NRR.
+  Abandoned matches and Super Overs are left out of NRR.
 - The league is complete when every pair of teams has met and no league match is
   waiting to be played. The top 2 then qualify for the final. Teams level on both
   points and NRR for a qualifying place are flagged instead of being picked.

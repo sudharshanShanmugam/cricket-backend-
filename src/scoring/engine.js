@@ -7,6 +7,7 @@
  */
 
 export const BALLS_PER_OVER = 6;
+export const SUPER_OVER_WICKETS = 2;
 
 export const WICKET_KINDS = [
   'bowled',
@@ -154,6 +155,8 @@ function apply(match, state, event) {
   if (state.status === 'abandoned') fail('This match has been abandoned');
   if (event.type === 'abandon') {
     if (state.status === 'completed') fail('The match is already complete');
+    // Once the scores have finished level, stopping early leaves a tie, not "no result".
+    if (state.innings[1]?.closed) return finish(state, current(state), { winner: null, text: 'Match tied' });
     state.status = 'abandoned';
     state.phase = 'done';
     state.result = { winner: null, text: event.reason ? `Match abandoned - ${event.reason}` : 'Match abandoned' };
@@ -204,12 +207,18 @@ function onToss(match, state, { winner, decision }) {
 
 function onInningsStart(match, state, { strikerId, nonStrikerId, bowlerId }) {
   if (!state.toss) fail('Record the toss first');
-  if (state.innings.length >= 2) fail('Both innings have already started');
-  if (state.innings.length === 1 && !state.innings[0].closed) fail('The first innings is still in progress');
+  const previous = current(state);
+  if (previous && !previous.closed) fail('An innings is already in progress');
 
+  // Innings come in pairs: the match itself, then one pair for each Super Over.
+  const played = state.innings.length;
+  const superOver = Math.floor(played / 2);
+  const chasing = played % 2 === 1;
   const { winner, decision } = state.toss;
-  const firstBatting = decision === 'bat' ? winner : 1 - winner;
-  const battingTeam = state.innings.length === 0 ? firstBatting : 1 - firstBatting;
+  let battingTeam;
+  if (!previous) battingTeam = decision === 'bat' ? winner : 1 - winner;
+  // The side that batted second goes first in the next Super Over.
+  else battingTeam = chasing ? 1 - previous.battingTeam : previous.battingTeam;
   const bowlingTeam = 1 - battingTeam;
 
   requirePlayer(match, battingTeam, strikerId, 'striker');
@@ -233,7 +242,9 @@ function onInningsStart(match, state, { strikerId, nonStrikerId, bowlerId }) {
     nonStrikerId,
     bowlerId,
     lastOverBowlerId: null,
-    target: state.innings.length === 1 ? state.innings[0].runs + 1 : null,
+    target: chasing ? previous.runs + 1 : null,
+    superOver, // 0 for the match itself
+    maxBalls: (superOver ? 1 : match.overs) * BALLS_PER_OVER,
     closed: false,
     closeReason: null,
   };
@@ -245,7 +256,7 @@ function onInningsStart(match, state, { strikerId, nonStrikerId, bowlerId }) {
   note(
     state,
     inn,
-    `${match.teams[battingTeam].name} innings begins. ${playerName(match, battingTeam, strikerId)} and ` +
+    `${superOver ? `Super Over${superOver > 1 ? ` ${superOver}` : ''}: ` : ''}${match.teams[battingTeam].name} innings begins. ${playerName(match, battingTeam, strikerId)} and ` +
       `${playerName(match, battingTeam, nonStrikerId)} to open, ${playerName(match, bowlingTeam, bowlerId)} to bowl.`,
   );
 }
@@ -370,11 +381,12 @@ function onBall(match, state, event) {
 
   if (inn.target && inn.runs >= inn.target) return closeInnings(match, state, inn, 'target');
   if (wicket && isAllOut(match, inn)) return closeInnings(match, state, inn, 'all out');
-  if (inn.legalBalls >= match.overs * BALLS_PER_OVER) return closeInnings(match, state, inn, 'overs');
+  if (inn.legalBalls >= inn.maxBalls) return closeInnings(match, state, inn, 'overs');
   updatePhase(state, inn);
 }
 
-const isAllOut = (match, inn) => availableBatters(match, inn).length === 0;
+const isAllOut = (match, inn) =>
+  (inn.superOver > 0 && inn.wickets >= SUPER_OVER_WICKETS) || availableBatters(match, inn).length === 0;
 
 function updatePhase(state, inn) {
   if (!inn.strikerId || !inn.nonStrikerId) state.phase = 'need_batter';
@@ -446,30 +458,34 @@ function closeInnings(match, state, inn, reason) {
   const team = match.teams[inn.battingTeam].name;
   note(state, inn, `Innings complete: ${team} ${inn.runs}/${inn.wickets} in ${oversText(inn.legalBalls)} overs`, 'over');
 
-  if (state.innings.length === 1) {
+  if (state.innings.length % 2 === 1) {
     state.phase = 'innings_break';
     return;
   }
 
-  const [first, second] = state.innings;
-  let result;
-  if (second.runs > first.runs) {
-    const left = match.teams[second.battingTeam].players.length - 1 - second.wickets;
-    const ballsLeft = match.overs * BALLS_PER_OVER - second.legalBalls;
-    result = {
-      winner: second.battingTeam,
-      text:
-        `${match.teams[second.battingTeam].name} won by ${plural(Math.max(left, 1), 'wicket')}` +
-        (ballsLeft > 0 ? ` (${plural(ballsLeft, 'ball')} left)` : ''),
-    };
-  } else if (second.runs < first.runs) {
-    result = {
-      winner: first.battingTeam,
-      text: `${match.teams[first.battingTeam].name} won by ${plural(first.runs - second.runs, 'run')}`,
-    };
-  } else {
-    result = { winner: null, text: 'Match tied' };
+  const [first, second] = state.innings.slice(-2);
+  if (first.runs === second.runs) {
+    state.phase = 'tied';
+    note(state, inn, `Scores level on ${inn.runs}. ${inn.superOver ? 'Another Super Over' : 'A Super Over'} will decide it.`, 'result');
+    return;
   }
+
+  const side = second.runs > first.runs ? second : first;
+  const name = match.teams[side.battingTeam].name;
+  let text;
+  if (inn.superOver) {
+    text = `Match tied - ${name} won the Super Over`;
+  } else if (side === second) {
+    const left = match.teams[second.battingTeam].players.length - 1 - second.wickets;
+    const ballsLeft = second.maxBalls - second.legalBalls;
+    text = `${name} won by ${plural(Math.max(left, 1), 'wicket')}` + (ballsLeft > 0 ? ` (${plural(ballsLeft, 'ball')} left)` : '');
+  } else {
+    text = `${name} won by ${plural(first.runs - second.runs, 'run')}`;
+  }
+  finish(state, inn, { winner: side.battingTeam, text });
+}
+
+function finish(state, inn, result) {
   state.result = result;
   state.status = 'completed';
   state.phase = 'done';
@@ -540,7 +556,6 @@ function describeBall({ runs, extra, nbExtra, boundary }) {
 /* ------------------------------------------------------------------ */
 
 function decorate(match, state) {
-  const maxBalls = match.overs * BALLS_PER_OVER;
   for (const inn of state.innings) {
     inn.overs_text = oversText(inn.legalBalls);
     inn.runRate = rate(inn.runs, inn.legalBalls);
@@ -554,7 +569,7 @@ function decorate(match, state) {
     inn.availableBatters = inn.closed ? [] : availableBatters(match, inn);
     if (inn.target && !inn.closed) {
       const need = inn.target - inn.runs;
-      const ballsLeft = maxBalls - inn.legalBalls;
+      const ballsLeft = inn.maxBalls - inn.legalBalls;
       inn.chase = { need, ballsLeft, requiredRate: rate(need, ballsLeft) };
     }
   }
@@ -565,7 +580,8 @@ export function summarise(match, state) {
   const inn = current(state);
   let line = '';
   if (state.result) line = state.result.text;
-  else if (state.phase === 'innings_break') line = `Innings break - target ${inn.runs + 1}`;
+  else if (state.phase === 'tied') line = 'Scores level - Super Over next';
+  else if (state.phase === 'innings_break') line = `${inn.superOver ? 'Super Over' : 'Innings'} break - target ${inn.runs + 1}`;
   else if (inn?.chase) {
     line = `${match.teams[inn.battingTeam].shortName} need ${plural(inn.chase.need, 'run')} from ${plural(inn.chase.ballsLeft, 'ball')}`;
   } else if (state.toss) {
@@ -582,6 +598,7 @@ export function summarise(match, state) {
       wickets: i.wickets,
       overs: oversText(i.legalBalls),
       closed: i.closed,
+      superOver: i.superOver,
     })),
   };
 }

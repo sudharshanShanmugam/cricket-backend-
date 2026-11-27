@@ -28,6 +28,11 @@ function played(a, b, first, second, extra) {
 
 const row = (table, id) => table.rows.find((r) => r.teamId === id);
 const SIX = [1, 1, 1, 1, 1, 1];
+/** Level scores that the scorer finishes as a tie. */
+const drawn = (a, b) => {
+  const m = played(a, b, SIX, SIX);
+  return { ...m, events: [...m.events, { type: 'abandon' }] };
+};
 
 test('every team is listed before any match', () => {
   const t = pointsTable(TEAMS, []);
@@ -52,7 +57,7 @@ test('a chase uses the balls actually faced; all out uses the full over', () => 
 
 test('tie and no result give one point each', () => {
   const abandoned = fixture('A', 'C', [{ type: 'abandon' }]);
-  const t = pointsTable(TEAMS, [played('A', 'B', SIX, SIX), abandoned]);
+  const t = pointsTable(TEAMS, [drawn('A', 'B'), abandoned]);
   assert.deepEqual([row(t, 'A').played, row(t, 'A').tied, row(t, 'A').noResult, row(t, 'A').points], [2, 1, 1, 2]);
   assert.equal(row(t, 'C').points, 1);
   assert.equal(row(t, 'C').nrr, 0);
@@ -76,8 +81,17 @@ test('a dead heat for a qualifying place is not decided by name', () => {
   const t = pointsTable(TEAMS, [
     played('A', 'B', [2, 2, 2, 2, 2, 2], SIX),
     played('A', 'C', [2, 2, 2, 2, 2, 2], SIX),
-    played('B', 'C', SIX, SIX),
+    drawn('B', 'C'),
   ]);
   assert.deepEqual(t.rows.filter((r) => r.qualified).map((r) => r.teamId), ['A']);
   assert.deepEqual(t.league.tiedForPlace, ['B', 'C']);
+});
+
+test('a Super Over win earns the points but leaves net run rate alone', () => {
+  const m = played('A', 'B', SIX, SIX);
+  const open = (bat, bowl) => ({ type: 'innings_start', strikerId: `${bat}1`, nonStrikerId: `${bat}2`, bowlerId: `${bowl}1` });
+  m.events.push(open('B', 'A'), ...balls([6, 0, 0, 0, 0, 0]), open('A', 'B'), ...balls([6, 6]));
+  const t = pointsTable(TEAMS, [m]);
+  assert.deepEqual([row(t, 'A').won, row(t, 'A').points, row(t, 'A').nrr], [1, 2, 0]);
+  assert.deepEqual([row(t, 'B').lost, row(t, 'B').points, row(t, 'B').nrr], [1, 0, 0]);
 });
