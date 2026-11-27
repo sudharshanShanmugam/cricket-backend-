@@ -150,11 +150,11 @@ const bravoFirst = second; // the side that batted second starts the Super Over
 const alphaChase = { type: 'innings_start', strikerId: 'a1', nonStrikerId: 'a2', bowlerId: 'b1' };
 const out = { type: 'ball', runs: 0, wicket: { kind: 'bowled' } };
 
-test('level scores wait for a Super Over', () => {
+test('level scores wait for the scorer to decide', () => {
   const m = setup({ overs: 1 });
   const s = play(m, ...level);
   assert.deepEqual([s.status, s.phase, s.result], ['live', 'tied', null]);
-  assert.equal(summarise(m, s).line, 'Scores level - Super Over next');
+  assert.equal(summarise(m, s).line, 'Scores level - waiting for the decision');
   assert.throws(() => play(m, ...level, ball(1)), /no innings/);
 });
 

@@ -468,7 +468,7 @@ function closeInnings(match, state, inn, reason) {
   const [first, second] = state.innings.slice(-2);
   if (first.runs === second.runs) {
     state.phase = 'tied';
-    note(state, inn, `Scores level on ${inn.runs}. ${inn.superOver ? 'Another Super Over' : 'A Super Over'} will decide it.`, 'result');
+    note(state, inn, `Scores level on ${inn.runs}.`, 'result');
     return;
   }
 
@@ -582,7 +582,7 @@ export function summarise(match, state) {
   const inn = current(state);
   let line = '';
   if (state.result) line = state.result.text;
-  else if (state.phase === 'tied') line = 'Scores level - Super Over next';
+  else if (state.phase === 'tied') line = 'Scores level - waiting for the decision';
   else if (state.phase === 'innings_break') line = `${inn.superOver ? 'Super Over' : 'Innings'} break - target ${inn.runs + 1}`;
   else if (inn?.chase) {
     line = `${match.teams[inn.battingTeam].shortName} need ${plural(inn.chase.need, 'run')} from ${plural(inn.chase.ballsLeft, 'ball')}`;

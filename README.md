@@ -81,9 +81,10 @@ All rules live in `src/scoring/engine.js`.
 - Wide and no ball: 1 run penalty and the ball is bowled again. No free-hit tracking.
 - Byes and leg byes are not charged to the bowler.
 - An innings ends when overs run out, the target is passed, or no batter is left.
-- Level scores go to a Super Over: one over each, and 2 wickets end the innings.
-  The side that batted second bats first. A level Super Over leads to another.
-  The scorer can instead finish the match as a tie. No DLS rain calculation.
+- When scores finish level, the scorer is asked to give 1 point to each team
+  (the match ends as a tie) or to play a Super Over: one over each, and 2
+  wickets end the innings. The side that batted second bats first. A level Super
+  Over asks again. A final offers only the Super Over. No DLS rain calculation.
 - No per-bowler over limit.
 
 ## Man of the Match
