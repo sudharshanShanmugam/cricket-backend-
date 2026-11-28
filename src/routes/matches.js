@@ -154,7 +154,9 @@ export function matchRoutes(config, live) {
     const event = parse(eventSchema, req.body.event);
     const match = await findMatch(req.params.id);
     if (match.rev !== rev) throw new HttpError(409, STALE);
-    res.json(await save(match, [...match.events, { ...event, at: new Date().toISOString() }]));
+    // Marks the rule these events were scored under (see the engine's isAllOut).
+    const rules = event.type === 'ball' || event.type === 'retire' ? { lastMan: true } : {};
+    res.json(await save(match, [...match.events, { ...event, ...rules, at: new Date().toISOString() }]));
   });
 
   router.post('/:id/undo', admin, async (req, res) => {

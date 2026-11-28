@@ -212,3 +212,39 @@ test('abandon stops further scoring', () => {
   assert.equal(s.status, 'abandoned');
   assert.throws(() => play(setup(), { type: 'abandon' }, ball(1)), /abandoned/);
 });
+
+// Events as the server records them now: the last batter plays on alone.
+const alone = (event) => ({ ...event, lastMan: true });
+const lastOne = [alone(out), { type: 'new_batter', batterId: 'a3' }, alone(out)];
+
+test('the last batter plays on alone and keeps the strike', () => {
+  const m = setup({ size: 3 });
+  const s = play(m, ...lastOne);
+  const inn = s.innings[0];
+  assert.deepEqual([s.phase, inn.closed, inn.lastBatter, inn.strikerId, inn.nonStrikerId], ['ready', false, true, 'a2', null]);
+  assert.match(s.commentary.at(-1).text, /A2 is the last batter/);
+
+  // One run, then to the end of the over: nobody else to take strike.
+  const on = play(m, ...lastOne, alone(ball(1)), alone(ball(3)), alone(ball(0)), alone(ball(0)));
+  assert.deepEqual([on.phase, on.innings[0].strikerId, on.innings[0].nonStrikerId], ['need_bowler', 'a2', null]);
+  assert.equal(on.innings[0].batting.find((b) => b.id === 'a2').runs, 4);
+  assert.throws(() => play(m, ...lastOne, { type: 'swap_strike' }), /only one batter/);
+});
+
+test('the innings ends when the last batter is out', () => {
+  for (const end of [alone(out), alone({ type: 'retire', batterId: 'a2', kind: 'out' })]) {
+    const s = play(setup({ size: 3 }), ...lastOne, end);
+    assert.deepEqual([s.phase, s.innings[0].closeReason, s.innings[0].wickets], ['innings_break', 'all out', 3]);
+  }
+});
+
+test('a run out can leave the non-striker as the last batter', () => {
+  const runOut = alone(ball(1, { wicket: { kind: 'run out', playerOutId: 'a2' } }));
+  const inn = play(setup({ size: 2 }), runOut).innings[0];
+  assert.deepEqual([inn.lastBatter, inn.strikerId, inn.nonStrikerId], [true, 'a1', null]);
+});
+
+test('every player is a wicket in hand for the chasing side', () => {
+  const s = play(setup({ overs: 1 }), alone(ball(4)), ...dots(5).map(alone), second, alone(ball(6)));
+  assert.equal(s.result.text, 'Bravo won by 4 wickets (5 balls left)');
+});

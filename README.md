@@ -80,7 +80,10 @@ All rules live in `src/scoring/engine.js`.
 - Six legal balls per over; the same bowler may bowl consecutive overs.
 - Wide and no ball: 1 run penalty and the ball is bowled again. No free-hit tracking.
 - Byes and leg byes are not charged to the bowler.
-- An innings ends when overs run out, the target is passed, or no batter is left.
+- An innings ends when overs run out, the target is passed, or every batter is
+  out. The last batter plays on alone and faces every ball, so a team of 5 has 5
+  wickets. A Super Over still ends after 2 wickets. Balls saved before this rule
+  was added are replayed under the old one, so earlier results do not change.
 - When scores finish level, the scorer is asked to give 1 point to each team
   (the match ends as a tie) or to play a Super Over: one over each, and 2
   wickets end the innings. The side that batted second bats first. A level Super

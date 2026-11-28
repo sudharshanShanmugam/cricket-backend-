@@ -120,6 +120,24 @@ function availableBatters(match, inn) {
   });
 }
 
+const atCrease = (inn) => [inn.strikerId, inn.nonStrikerId].filter(Boolean);
+
+/** The last batter standing plays on without a partner. */
+const isLoneBatter = (match, inn) =>
+  inn.lastMan && atCrease(inn).length === 1 && availableBatters(match, inn).length === 0;
+
+/** A lone batter faces every ball, whatever the runs or the end of an over. */
+function keepStrike(match, inn) {
+  if (!isLoneBatter(match, inn)) return;
+  [inn.strikerId] = atCrease(inn);
+  inn.nonStrikerId = null;
+}
+
+function noteLoneBatter(match, state, inn) {
+  if (!isLoneBatter(match, inn)) return;
+  note(state, inn, `${playerName(match, inn.battingTeam, inn.strikerId)} is the last batter and plays on alone`);
+}
+
 function note(state, inn, text, kind = 'info') {
   state.commentary.push({
     innings: state.innings.indexOf(inn),
@@ -177,7 +195,7 @@ function apply(match, state, event) {
     case 'new_bowler':
       return onNewBowler(match, state, event);
     case 'swap_strike':
-      return onSwapStrike(state);
+      return onSwapStrike(match, state);
     case 'retire':
       return onRetire(match, state, event);
     case 'end_innings': {
@@ -245,6 +263,7 @@ function onInningsStart(match, state, { strikerId, nonStrikerId, bowlerId }) {
     lastOverBowlerId: null,
     target: chasing ? previous.runs + 1 : null,
     superOver, // 0 for the match itself
+    lastMan: false, // set by the first event recorded under the last batter rule
     maxBalls: (superOver ? 1 : match.overs) * BALLS_PER_OVER,
     closed: false,
     closeReason: null,
@@ -264,7 +283,9 @@ function onInningsStart(match, state, { strikerId, nonStrikerId, bowlerId }) {
 
 function onBall(match, state, event) {
   const inn = openInnings(state);
-  if (!inn.strikerId || !inn.nonStrikerId) fail('Select the new batter first');
+  // Events saved before the rule existed have no flag, so old results never change.
+  if (event.lastMan) inn.lastMan = true;
+  if (atCrease(inn).length < 2 && !isLoneBatter(match, inn)) fail('Select the new batter first');
   if (!inn.bowlerId) fail('Select the bowler first');
 
   const runs = event.runs ?? 0;
@@ -381,17 +402,23 @@ function onBall(match, state, event) {
     );
   }
 
+  keepStrike(match, inn);
+
   if (inn.target && inn.runs >= inn.target) return closeInnings(match, state, inn, 'target');
   if (wicket && isAllOut(match, inn)) return closeInnings(match, state, inn, 'all out');
   if (inn.legalBalls >= inn.maxBalls) return closeInnings(match, state, inn, 'overs');
-  updatePhase(state, inn);
+  if (wicket) noteLoneBatter(match, state, inn);
+  updatePhase(match, state, inn);
 }
 
-const isAllOut = (match, inn) =>
-  (inn.superOver > 0 && inn.wickets >= SUPER_OVER_WICKETS) || availableBatters(match, inn).length === 0;
+function isAllOut(match, inn) {
+  if (inn.superOver > 0 && inn.wickets >= SUPER_OVER_WICKETS) return true;
+  if (availableBatters(match, inn).length) return false;
+  return !inn.lastMan || atCrease(inn).length === 0;
+}
 
-function updatePhase(state, inn) {
-  if (!inn.strikerId || !inn.nonStrikerId) state.phase = 'need_batter';
+function updatePhase(match, state, inn) {
+  if (atCrease(inn).length < 2 && !isLoneBatter(match, inn)) state.phase = 'need_batter';
   else if (!inn.bowlerId) state.phase = 'need_bowler';
   else state.phase = 'ready';
 }
@@ -407,7 +434,7 @@ function onNewBatter(match, state, { batterId }) {
   if (!inn.strikerId) inn.strikerId = batterId;
   else inn.nonStrikerId = batterId;
   note(state, inn, `${row.name} ${returning ? 'returns to the crease' : 'comes to the crease'}`);
-  updatePhase(state, inn);
+  updatePhase(match, state, inn);
 }
 
 function onNewBowler(match, state, { bowlerId }) {
@@ -417,18 +444,20 @@ function onNewBowler(match, state, { bowlerId }) {
   const row = bowler(match, inn, bowlerId);
   inn.bowlerId = bowlerId;
   note(state, inn, `${row.name} into the attack`);
-  updatePhase(state, inn);
+  updatePhase(match, state, inn);
 }
 
-function onSwapStrike(state) {
+function onSwapStrike(match, state) {
   const inn = openInnings(state);
+  if (isLoneBatter(match, inn)) fail('There is only one batter left');
   [inn.strikerId, inn.nonStrikerId] = [inn.nonStrikerId, inn.strikerId];
   note(state, inn, 'Strike changed');
-  updatePhase(state, inn);
+  updatePhase(match, state, inn);
 }
 
-function onRetire(match, state, { batterId, kind }) {
+function onRetire(match, state, { batterId, kind, lastMan }) {
   const inn = openInnings(state);
+  if (lastMan) inn.lastMan = true;
   if (!batterId || (batterId !== inn.strikerId && batterId !== inn.nonStrikerId)) {
     fail('Only a batter at the crease can retire');
   }
@@ -445,12 +474,14 @@ function onRetire(match, state, { batterId, kind }) {
     inn.fow.push({ wicket: inn.wickets, runs: inn.runs, over: oversText(inn.legalBalls), playerId: batterId, name: row.name });
     note(state, inn, `${row.name} retired out - ${row.runs} (${row.balls})`, 'wicket');
     if (isAllOut(match, inn)) return closeInnings(match, state, inn, 'all out');
+    keepStrike(match, inn);
+    noteLoneBatter(match, state, inn);
   } else {
     row.status = 'retired hurt';
     row.howOut = 'retired hurt';
     note(state, inn, `${row.name} retired hurt - ${row.runs} (${row.balls})`);
   }
-  updatePhase(state, inn);
+  updatePhase(match, state, inn);
 }
 
 function closeInnings(match, state, inn, reason) {
@@ -478,7 +509,9 @@ function closeInnings(match, state, inn, reason) {
   if (inn.superOver) {
     text = `Match tied - ${name} won the Super Over`;
   } else if (side === second) {
-    const left = match.teams[second.battingTeam].players.length - 1 - second.wickets;
+    // With a last batter playing alone, every player is a wicket in hand.
+    const wickets = match.teams[second.battingTeam].players.length - (second.lastMan ? 0 : 1);
+    const left = wickets - second.wickets;
     const ballsLeft = second.maxBalls - second.legalBalls;
     text = `${name} won by ${plural(Math.max(left, 1), 'wicket')}` + (ballsLeft > 0 ? ` (${plural(ballsLeft, 'ball')} left)` : '');
   } else {
@@ -569,6 +602,7 @@ function decorate(match, state) {
     const done = new Set(inn.batting.map((b) => b.id));
     inn.yetToBat = match.teams[inn.battingTeam].players.filter((p) => !done.has(p.id));
     inn.availableBatters = inn.closed ? [] : availableBatters(match, inn);
+    inn.lastBatter = !inn.closed && isLoneBatter(match, inn);
     if (inn.target && !inn.closed) {
       const need = inn.target - inn.runs;
       const ballsLeft = inn.maxBalls - inn.legalBalls;
